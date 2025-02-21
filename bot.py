@@ -25,7 +25,7 @@ def send_telegram_message(data):
         f"🎯 Адсет: {data.get('sub_id_5', 'N/A')}\n"
         f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}"
     )
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
 
 # Эндпоинт для обработки query-параметров
 @app.route('/webhook', methods=['GET'])
