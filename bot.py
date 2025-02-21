@@ -23,36 +23,48 @@ def send_telegram_message(data):
         f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
         f"🎯 Кампания: {data.get('sub_id_4', 'N/A')}\n"
         f"🎯 Адсет: {data.get('sub_id_5', 'N/A')}\n"
-        f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}"
+        f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}\n"
+        f"🔗 Click ID: {data.get('click_id', 'N/A')}\n"
+        f"👤 User ID: {data.get('user_id', 'N/A')}"
     )
     bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
 
-# Эндпоинт для обработки query-параметров
-@app.route('/webhook', methods=['GET'])
+# Эндпоинт для обработки GET и POST запросов
+@app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
     """
-    Обрабатывает GET-запросы с query-параметрами.
+    Обрабатывает GET и POST запросы.
     """
-    # Получаем query-параметры
-    sub_id = request.args.get('sub_id')
-    offer_id = request.args.get('offer_id')
+    if request.method == 'POST':
+        data = request.json  # Данные из POST-запроса
+    else:
+        data = request.args  # Данные из GET-запроса
 
     # Формируем данные для отправки в Telegram
-    data = {
-        'sub_id': sub_id,
-        'offer_id': offer_id,
-        'goal': request.args.get('goal', 'N/A'),
-        'status': request.args.get('status', 'N/A'),
-        'revenue': request.args.get('revenue', 'N/A'),
-        'currency': request.args.get('currency', 'N/A'),
-        'sub_id_4': request.args.get('sub_id_4', 'N/A'),
-        'sub_id_5': request.args.get('sub_id_5', 'N/A'),
-        'conversion_date': request.args.get('conversion_date', 'N/A')
+    message_data = {
+        'offer_id': data.get('offer_id', 'N/A'),
+        'sub_id': data.get('sub_id', 'N/A'),
+        'sub_id_2': data.get('sub_id_2', 'N/A'),
+        'sub_id_3': data.get('sub_id_3', 'N/A'),
+        'sub_id_4': data.get('sub_id_4', 'N/A'),
+        'sub_id_5': data.get('sub_id_5', 'N/A'),
+        'goal': data.get('goal', 'N/A'),
+        'status': data.get('status', 'N/A'),
+        'revenue': data.get('revenue', 'N/A'),
+        'currency': data.get('currency', 'N/A'),
+        'conversion_date': data.get('conversion_date', 'N/A'),
+        'click_id': data.get('click_id', 'N/A'),
+        'user_id': data.get('user_id', 'N/A')
     }
 
     # Отправляем данные в Telegram
-    send_telegram_message(data)
+    send_telegram_message(message_data)
     return 'OK', 200
+
+# Эндпоинт для favicon.ico
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204  # Возвращаем пустой ответ
 
 # Запуск Flask-сервера
 if __name__ == '__main__':
