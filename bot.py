@@ -16,18 +16,25 @@ async def send_telegram_message_async(data):
     """
     Формирует и отправляет сообщение в Telegram.
     """
+    # Экранируем специальные символы
+    def escape_markdown(text):
+        if text is None:
+            return "N/A"
+        return str(text).replace("*", "\\*").replace("_", "\\_").replace("[", "\\[").replace("]", "\\]")
+
     message = (
-         "**🔔 Новая конверсия!**\n\n"  # Жирный текст с эмодзи
-        f"📌 Оффер: {data.get('offer_id', 'N/A')}\n"
-        f"🛠 Подход: {data.get('sub_id_3', 'N/A')}\n"
-        f"📊 Тип конверсии: {data.get('goal', 'N/A')}\n"
-        f"⚙️ Статус конверсии: {data.get('status', 'N/A')}\n"
-        f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
-        f"🎯 Кампания: {data.get('sub_id_4', 'N/A')}\n"
-        f"🎯 Адсет: {data.get('sub_id_5', 'N/A')}\n"
-        f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}\n"
+        "**🔔 Новая конверсия!**\n\n"  # Жирный текст с эмодзи
+        f"📌 Оффер: {escape_markdown(data.get('offer_id'))}\n"
+        f"🛠 Подход: {escape_markdown(data.get('sub_id_3'))}\n"
+        f"📊 Тип конверсии: {escape_markdown(data.get('goal'))}\n"
+        f"⚙️ Статус конверсии: {escape_markdown(data.get('status'))}\n"
+        f"🤑 Выплата: {escape_markdown(data.get('revenue'))} {escape_markdown(data.get('currency'))}\n"
+        f"🎯 Кампания: {escape_markdown(data.get('sub_id_4'))}\n"
+        f"🎯 Адсет: {escape_markdown(data.get('sub_id_5'))}\n"
+        f"⏰ Время конверсии: {escape_markdown(data.get('conversion_date'))}"
     )
-    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
+
+    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='MarkdownV2')
 
 # Эндпоинт для обработки GET и POST запросов
 @app.route('/webhook', methods=['GET', 'POST'])
