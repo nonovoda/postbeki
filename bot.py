@@ -1,6 +1,7 @@
 from flask import Flask, request
 from telegram import Bot
 import os
+import asyncio
 
 # Загрузка конфигурации из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # Токен Telegram-бота
@@ -10,8 +11,8 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')  # Chat ID для отправ�
 app = Flask(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
-# Функция для отправки сообщения в Telegram
-def send_telegram_message(data):
+# Асинхронная функция для отправки сообщения в Telegram
+async def send_telegram_message_async(data):
     """
     Формирует и отправляет сообщение в Telegram.
     """
@@ -27,7 +28,7 @@ def send_telegram_message(data):
         f"🔗 Click ID: {data.get('click_id', 'N/A')}\n"
         f"👤 User ID: {data.get('user_id', 'N/A')}"
     )
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
+    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
 
 # Эндпоинт для обработки GET и POST запросов
 @app.route('/webhook', methods=['GET', 'POST'])
@@ -57,8 +58,8 @@ def webhook():
         'user_id': data.get('user_id', 'N/A')
     }
 
-    # Отправляем данные в Telegram
-    send_telegram_message(message_data)
+    # Запускаем асинхронную задачу для отправки сообщения
+    asyncio.run(send_telegram_message_async(message_data))
     return 'OK', 200
 
 # Эндпоинт для favicon.ico
