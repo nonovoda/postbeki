@@ -26,8 +26,6 @@ async def send_telegram_message_async(data):
         f"🎯 Кампания: {data.get('sub_id_4', 'N/A')}\n"
         f"🎯 Адсет: {data.get('sub_id_5', 'N/A')}\n"
         f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}\n"
-        f"🔗 Click ID: {data.get('click_id', 'N/A')}\n"
-        f"👤 User ID: {data.get('user_id', 'N/A')}"
     )
     await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
 
