@@ -19,7 +19,7 @@ async def send_telegram_message_async(data):
     message = (
          "**🔔 Новая конверсия!**\n\n"  # Жирный текст с эмодзи
         f"📌 Оффер: {data.get('offer_id', 'N/A')}\n"
-        f"🛠 Подход: {data.get('sub_id', 'N/A')}\n"
+        f"🛠 Подход: {data.get('sub_id_3', 'N/A')}\n"
         f"📊 Тип конверсии: {data.get('goal', 'N/A')}\n"
         f"⚙️ Статус конверсии: {data.get('status', 'N/A')}\n"
         f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
