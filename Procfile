@@ -1,1 +1,1 @@
-web: gunicorn -w 4 bot:app
+web: hypercorn app:app --bind 0.0.0.0:$PORT
