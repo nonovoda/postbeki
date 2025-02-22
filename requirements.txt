@@ -1,3 +1,7 @@
 quart
 python-telegram-bot
-hypercorn
+sqlite3
+requests
+python-dotenv
+logging
+uvicorn
