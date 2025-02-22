@@ -3,7 +3,6 @@ from telegram import Bot
 import os
 import logging
 import sqlite3
-from datetime import datetime
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -121,81 +120,6 @@ async def webhook():
     except Exception as e:
         logger.error(f"Ошибка при обработке запроса: {e}")
         return 'Internal Server Error', 500
-
-# Функция для получения статистики
-def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
-    conn = sqlite3.connect('conversions.db')
-    cursor = conn.cursor()
-
-    query = '''
-        SELECT pp_name, offer_id, SUM(revenue), COUNT(*)
-        FROM conversions
-        WHERE 1=1
-    '''
-    params = []
-
-    if start_date:
-        query += ' AND conversion_date >= ?'
-        params.append(start_date)
-    if end_date:
-        query += ' AND conversion_date <= ?'
-        params.append(end_date)
-    if offer_id:
-        query += ' AND offer_id = ?'
-        params.append(offer_id)
-    if pp_name:
-        query += ' AND pp_name = ?'
-        params.append(pp_name)
-
-    query += ' GROUP BY pp_name, offer_id'
-    cursor.execute(query, params)
-    results = cursor.fetchall()
-    conn.close()
-
-    return results
-
-# Команда для запроса статистики
-async def stats(update, context):
-    try:
-        # Парсим аргументы команды
-        args = context.args
-        start_date = None
-        end_date = None
-        offer_id = None
-        pp_name = None
-
-        for i in range(0, len(args), 2):
-            if args[i] == 'start_date':
-                start_date = args[i + 1]
-            elif args[i] == 'end_date':
-                end_date = args[i + 1]
-            elif args[i] == 'offer_id':
-                offer_id = args[i + 1]
-            elif args[i] == 'pp_name':
-                pp_name = args[i + 1]
-
-        # Получаем статистику
-        stats_data = get_statistics(start_date, end_date, offer_id, pp_name)
-
-        if not stats_data:
-            await update.message.reply_text("Статистика не найдена.")
-            return
-
-        # Формируем сообщение
-        message = "📊 Статистика:\n\n"
-        for row in stats_data:
-            pp_name, offer_id, total_revenue, total_conversions = row
-            message += (
-                f"📌 Партнёрская программа: <i>{pp_name}</i>\n"
-                f"📌 Оффер: <i>{offer_id}</i>\n"
-                f"🤑 Общая выплата: <i>{total_revenue}</i>\n"
-                f"📊 Конверсий: <i>{total_conversions}</i>\n\n"
-            )
-
-        await update.message.reply_text(message, parse_mode='HTML')
-    except Exception as e:
-        logger.error(f"Ошибка при запросе статистики: {e}")
-        await update.message.reply_text("Произошла ошибка при запросе статистики.")
 
 # Эндпоинт для favicon.ico
 @app.route('/favicon.ico')
