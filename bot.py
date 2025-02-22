@@ -122,12 +122,14 @@ async def favicon():
 
 # Команды бота
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Обработка команды /start")
     await update.message.reply_text(
         "Привет! Я бот для уведомлений о конверсиях.\n"
         "Используй /help для списка команд."
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Обработка команды /help")
     commands = (
         "📋 Список доступных команд:\n"
         "/start - Начать работу с ботом\n"
@@ -138,12 +140,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(commands)
 
 async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Обработка команды /stats_today")
     today = datetime.now().strftime('%Y-%m-%d')
     stats_data = await asyncio.to_thread(get_statistics, start_date=today)
     message = format_stats_message(stats_data, "Статистика за сегодня")
     await update.message.reply_text(message, parse_mode='HTML')
 
 async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Обработка команды /stats_month")
     first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
     stats_data = await asyncio.to_thread(get_statistics, start_date=first_day_of_month)
     message = format_stats_message(stats_data, "Статистика за месяц")
@@ -197,6 +201,7 @@ def format_stats_message(stats_data, title):
 
 # Запуск бота
 async def run_bot():
+    logger.info("Запуск Telegram бота...")
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
@@ -207,7 +212,11 @@ async def run_bot():
 # Основная функция
 async def main():
     init_db()  # Инициализация базы данных
-    bot_task = asyncio.create_task(run_bot())  # Запуск бота в фоновом режиме
+
+    # Запуск бота в фоновом режиме
+    bot_task = asyncio.create_task(run_bot())
+
+    # Запуск Quart
     port = int(os.getenv('PORT', 5000))  # Порт из переменной окружения или 5000 по умолчанию
     await app.run_task(host='0.0.0.0', port=port)
 
