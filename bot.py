@@ -1,6 +1,6 @@
 from quart import Quart, request
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import logging
 import sqlite3
@@ -131,42 +131,79 @@ async def favicon():
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Статистика за сегодня", callback_data='stats_today')],
-        [InlineKeyboardButton("Статистика за месяц", callback_data='stats_month')],
-        [InlineKeyboardButton("Отключить уведомления", callback_data='mute')],
-        [InlineKeyboardButton("Включить уведомления", callback_data='unmute')],
-        [InlineKeyboardButton("Помощь", callback_data='help')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+    """
+    Обрабатывает команду /start.
+    """
+    await update.message.reply_text(
+        "Привет! Я бот для уведомлений о конверсиях.\n"
+        "Используй /help для списка команд."
+    )
 
-# Обработка callback-запросов
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+# Команда /help
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обрабатывает команду /help.
+    """
+    commands = (
+        "📋 Список доступных команд:\n"
+        "/start - Начать работу с ботом\n"
+        "/help - Показать список команд\n"
+        "/stats_today - Получить статистику за сегодня\n"
+        "/stats_month - Получить статистику за месяц"
+    )
+    await update.message.reply_text(commands)
 
-    if query.data == 'stats_today':
-        today = datetime.now().strftime('%Y-%m-%d')
-        stats_data = get_statistics(start_date=today)
-        message = format_stats_message(stats_data, "Статистика за сегодня")
-    elif query.data == 'stats_month':
-        first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-        stats_data = get_statistics(start_date=first_day_of_month)
-        message = format_stats_message(stats_data, "Статистика за месяц")
-    elif query.data == 'mute':
-        message = "🔕 Уведомления отключены."
-    elif query.data == 'unmute':
-        message = "🔔 Уведомления включены."
-    elif query.data == 'help':
-        message = (
-            "📋 Список команд:\n"
-            "/start - Начать работу с ботом\n"
-            "/stats - Получить статистику\n"
-            "Используйте кнопки для быстрых действий."
-        )
+# Команда /stats_today
+async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обрабатывает команду /stats_today.
+    """
+    today = datetime.now().strftime('%Y-%m-%d')
+    stats_data = get_statistics(start_date=today)
+    message = format_stats_message(stats_data, "Статистика за сегодня")
+    await update.message.reply_text(message, parse_mode='HTML')
 
-    await query.edit_message_text(text=message, parse_mode='HTML')
+# Команда /stats_month
+async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обрабатывает команду /stats_month.
+    """
+    first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    stats_data = get_statistics(start_date=first_day_of_month)
+    message = format_stats_message(stats_data, "Статистика за месяц")
+    await update.message.reply_text(message, parse_mode='HTML')
+
+# Функция для получения статистики
+def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
+    conn = sqlite3.connect('conversions.db')
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT pp_name, offer_id, SUM(revenue), COUNT(*)
+        FROM conversions
+        WHERE 1=1
+    '''
+    params = []
+
+    if start_date:
+        query += ' AND conversion_date >= ?'
+        params.append(start_date)
+    if end_date:
+        query += ' AND conversion_date <= ?'
+        params.append(end_date)
+    if offer_id:
+        query += ' AND offer_id = ?'
+        params.append(offer_id)
+    if pp_name:
+        query += ' AND pp_name = ?'
+        params.append(pp_name)
+
+    query += ' GROUP BY pp_name, offer_id'
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    conn.close()
+
+    return results
 
 # Форматирование сообщения со статистикой
 def format_stats_message(stats_data, title):
@@ -188,7 +225,9 @@ def format_stats_message(stats_data, title):
 async def run_bot():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("stats_today", stats_today))
+    application.add_handler(CommandHandler("stats_month", stats_month))
     await application.run_polling()
 
 # Запуск Quart-сервера и бота
