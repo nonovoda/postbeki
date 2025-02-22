@@ -1,8 +1,11 @@
 from quart import Quart, request
-from telegram import Bot
+from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 import logging
 import sqlite3
+from datetime import datetime
+import threading
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -126,8 +129,76 @@ async def webhook():
 async def favicon():
     return '', 204  # Возвращаем пустой ответ
 
-# Запуск Quart-сервера
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("Статистика за сегодня", callback_data='stats_today')],
+        [InlineKeyboardButton("Статистика за месяц", callback_data='stats_month')],
+        [InlineKeyboardButton("Отключить уведомления", callback_data='mute')],
+        [InlineKeyboardButton("Включить уведомления", callback_data='unmute')],
+        [InlineKeyboardButton("Помощь", callback_data='help')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+
+# Обработка callback-запросов
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == 'stats_today':
+        today = datetime.now().strftime('%Y-%m-%d')
+        stats_data = get_statistics(start_date=today)
+        message = format_stats_message(stats_data, "Статистика за сегодня")
+    elif query.data == 'stats_month':
+        first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+        stats_data = get_statistics(start_date=first_day_of_month)
+        message = format_stats_message(stats_data, "Статистика за месяц")
+    elif query.data == 'mute':
+        message = "🔕 Уведомления отключены."
+    elif query.data == 'unmute':
+        message = "🔔 Уведомления включены."
+    elif query.data == 'help':
+        message = (
+            "📋 Список команд:\n"
+            "/start - Начать работу с ботом\n"
+            "/stats - Получить статистику\n"
+            "Используйте кнопки для быстрых действий."
+        )
+
+    await query.edit_message_text(text=message, parse_mode='HTML')
+
+# Форматирование сообщения со статистикой
+def format_stats_message(stats_data, title):
+    if not stats_data:
+        return f"📊 {title}:\n\nНет данных."
+
+    message = f"📊 {title}:\n\n"
+    for row in stats_data:
+        pp_name, offer_id, total_revenue, total_conversions = row
+        message += (
+            f"📌 Партнёрская программа: <i>{pp_name}</i>\n"
+            f"📌 Оффер: <i>{offer_id}</i>\n"
+            f"🤑 Общая выплата: <i>{total_revenue}</i>\n"
+            f"📊 Конверсий: <i>{total_conversions}</i>\n\n"
+        )
+    return message
+
+# Функция для запуска бота
+def run_bot():
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.run_polling()
+
+# Запуск Quart-сервера и бота
 if __name__ == '__main__':
     init_db()  # Инициализация базы данных
+
+    # Запуск бота в отдельном потоке
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
+
+    # Запуск Quart-сервера
     port = int(os.getenv('PORT', 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
     app.run(host='0.0.0.0', port=port)
