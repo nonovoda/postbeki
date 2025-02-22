@@ -5,7 +5,7 @@ import os
 import logging
 import sqlite3
 from datetime import datetime
-import threading
+import asyncio
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -185,20 +185,23 @@ def format_stats_message(stats_data, title):
     return message
 
 # Функция для запуска бота
-def run_bot():
+async def run_bot():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.run_polling()
+    await application.run_polling()
 
 # Запуск Quart-сервера и бота
-if __name__ == '__main__':
+async def main():
     init_db()  # Инициализация базы данных
 
-    # Запуск бота в отдельном потоке
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
+    # Запуск бота в фоновом режиме
+    bot_task = asyncio.create_task(run_bot())
 
     # Запуск Quart-сервера
     port = int(os.getenv('PORT', 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
-    app.run(host='0.0.0.0', port=port)
+    await app.run_task(host='0.0.0.0', port=port)
+
+# Запуск приложения
+if __name__ == '__main__':
+    asyncio.run(main())
