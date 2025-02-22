@@ -22,16 +22,16 @@ async def send_telegram_message_async(data):
     """
     try:
         message = (
-            "🔔 Новая конверсия!\n"
-            f"📌 Оффер: {data.get('offer_id', 'N/A')}\n"
-            f"🆔 ID конверсии: {data.get('id', 'N/A')}\n"
-            f"🛠 Подход: {data.get('sub_id3', 'N/A')}\n"
-            f"📊 Тип конверсии: {data.get('goal', 'N/A')}\n"
-            f"⚙️ Статус конверсии: {data.get('status', 'N/A')}\n"
-            f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
-            f"🎯 Кампания: {data.get('sub_id4', 'N/A')}\n"
-            f"🎯 Адсет: {data.get('sub_id5', 'N/A')}\n"
-            f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}"
+            "<b>🔔 Новая конверсия!</b>\n\n"  # Жирный текст
+            f"📌 <b>Оффер:</b> <i>{data.get('offer_id', 'N/A')}</i>\n"
+            f"🆔 <b>ID конверсии:</b> <i>{data.get('id', 'N/A')}</i>\n"
+            f"🛠 <b>Подход:</b> <i>{data.get('sub_id3', 'N/A')}</i>\n"
+            f"📊 <b>Тип конверсии:</b> <i>{data.get('goal', 'N/A')}</i>\n"
+            f"⚙️ <b>Статус конверсии:</b> <i>{data.get('status', 'N/A')}</i>\n"
+            f"🤑 <b>Выплата:</b> <i>{data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}</i>\n"
+            f"🎯 <b>Кампания:</b> <i>{data.get('sub_id4', 'N/A')}</i>\n"
+            f"🎯 <b>Адсет:</b> <i>{data.get('sub_id5', 'N/A')}</i>\n"
+            f"⏰ <b>Время конверсии:</b> <i>{data.get('conversion_date', 'N/A')}</i>"
         )
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='HTML')
         logger.info("Сообщение успешно отправлено в Telegram.")
