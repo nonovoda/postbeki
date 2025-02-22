@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from datetime import datetime
 from quart import Quart, request
-from telegram import Bot
+from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import asyncio
 
