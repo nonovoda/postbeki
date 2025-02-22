@@ -1,5 +1,6 @@
 from flask import Flask, request
 from telegram import Bot
+from telegram.request import HTTPXRequest
 import os
 import asyncio
 
@@ -7,16 +8,23 @@ import asyncio
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # Токен Telegram-бота
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')  # Chat ID для отправки сообщений
 
+# Настройка Request с увеличенным пулом соединений и таймаутами
+request = HTTPXRequest(
+    connection_pool_size=10,  # Увеличиваем пул до 10 соединений
+    read_timeout=30,  # Таймаут на чтение: 30 секунд
+    write_timeout=30,  # Таймаут на запись: 30 секунд
+    connect_timeout=30  # Таймаут на подключение: 30 секунд
+)
+
 # Инициализация Flask и Telegram бота
 app = Flask(__name__)
-bot = Bot(token=TELEGRAM_BOT_TOKEN)
+bot = Bot(token=TELEGRAM_BOT_TOKEN, request=request)
 
 # Асинхронная функция для отправки сообщения в Telegram
 async def send_telegram_message_async(data):
     """
-    Формирует и отправляет сообщение в Telegram с использованием HTML-разметки.
+    Формирует и отправляет сообщение в Telegram.
     """
-    # Формируем сообщение с HTML-разметкой
     message = (
         "<b>🔔 Новая конверсия!</b>\n\n"  # Жирный текст с эмодзи
         f"📌 Оффер: {data.get('offer_id', 'N/A')}\n"
@@ -28,10 +36,8 @@ async def send_telegram_message_async(data):
         f"🎯 Адсет: {data.get('sub_id_5', 'N/A')}\n"
         f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}"
     )
-
-    # Отправляем сообщение с HTML-разметкой
     await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='HTML')
-    
+
 # Эндпоинт для обработки GET и POST запросов
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
@@ -46,21 +52,17 @@ def webhook():
     # Формируем данные для отправки в Telegram
     message_data = {
         'offer_id': data.get('offer_id', 'N/A'),
-        'sub_id': data.get('sub_id', 'N/A'),
-        'sub_id_2': data.get('sub_id_2', 'N/A'),
         'sub_id_3': data.get('sub_id_3', 'N/A'),
-        'sub_id_4': data.get('sub_id_4', 'N/A'),
-        'sub_id_5': data.get('sub_id_5', 'N/A'),
         'goal': data.get('goal', 'N/A'),
         'status': data.get('status', 'N/A'),
         'revenue': data.get('revenue', 'N/A'),
         'currency': data.get('currency', 'N/A'),
-        'conversion_date': data.get('conversion_date', 'N/A'),
-        'click_id': data.get('click_id', 'N/A'),
-        'user_id': data.get('user_id', 'N/A')
+        'sub_id_4': data.get('sub_id_4', 'N/A'),
+        'sub_id_5': data.get('sub_id_5', 'N/A'),
+        'conversion_date': data.get('conversion_date', 'N/A')
     }
 
-    # Запускаем асинхронную задачу для отправки сообщения
+    # Запускаем асинхронную задачу
     asyncio.run(send_telegram_message_async(message_data))
     return 'OK', 200
 
