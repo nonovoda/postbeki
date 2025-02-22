@@ -1,20 +1,21 @@
-from quart import Quart, request, jsonify
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import logging
 import sqlite3
 from datetime import datetime
 import asyncio
 
+from quart import Quart, request, jsonify
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Загрузка конфигурации из переменных окружения
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # Токен Telegram-бота
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')        # Chat ID для отправки сообщений
-TELEGRAM_WEBHOOK_URL = os.getenv('TELEGRAM_WEBHOOK_URL')  # Базовый URL для Telegram вебхука
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')       # Токен Telegram-бота
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')           # Chat ID для отправки сообщений
+TELEGRAM_WEBHOOK_URL = os.getenv('TELEGRAM_WEBHOOK_URL')     # Базовый URL приложения (например, https://your-app.up.railway.app)
 
 if not TELEGRAM_WEBHOOK_URL:
     logger.error("Переменная окружения TELEGRAM_WEBHOOK_URL не задана!")
@@ -60,9 +61,6 @@ def save_conversion(data):
 
 # Асинхронная функция для отправки сообщения в Telegram
 async def send_telegram_message_async(data):
-    """
-    Формирует и отправляет сообщение в Telegram.
-    """
     try:
         message = (
             f"<b>🔔 Новая конверсия!</b>\n\n"
@@ -92,7 +90,6 @@ async def webhook():
             data = request.args  # Данные из GET-запроса
 
         logger.info(f"Получены данные постбека: {data}")
-
         if data is None:
             logger.error("Данные запроса отсутствуют или равны None.")
             return 'Bad Request: Данные отсутствуют', 400
@@ -113,59 +110,25 @@ async def webhook():
 
         save_conversion(message_data)
         logger.info(f"Сформированные данные для Telegram: {message_data}")
-
         await send_telegram_message_async(message_data)
         return 'OK', 200
     except Exception as e:
         logger.error(f"Ошибка при обработке постбека: {e}")
         return 'Internal Server Error', 500
 
-# Эндпоинт для обработки Telegram-обновлений (команд)
+# Эндпоинт для обработки обновлений от Telegram (команды)
 @app.route('/telegram', methods=['POST'])
 async def telegram_webhook():
     try:
         update_json = await request.get_json()
         update = Update.de_json(update_json, bot)
-        # Передаём обновление в telegram.ext Application для обработки команд
+        # Передаём обновление в telegram_app для обработки команд
         await telegram_app.process_update(update)
         return jsonify({"ok": True})
     except Exception as e:
         logger.error(f"Ошибка при обработке Telegram обновления: {e}")
         return jsonify({"ok": False}), 500
 
-# Команда /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Привет! Я бот для уведомлений о конверсиях.\n"
-        "Используй /help для списка команд."
-    )
-
-# Команда /help
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    commands = (
-        "📋 Список доступных команд:\n"
-        "/start - Начать работу с ботом\n"
-        "/help - Показать список команд\n"
-        "/stats_today - Получить статистику за сегодня\n"
-        "/stats_month - Получить статистику за месяц"
-    )
-    await update.message.reply_text(commands)
-
-# Команда /stats_today
-async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    today = datetime.now().strftime('%Y-%m-%d')
-    stats_data = get_statistics(start_date=today)
-    message = format_stats_message(stats_data, "Статистика за сегодня")
-    await update.message.reply_text(message, parse_mode='HTML')
-
-# Команда /stats_month
-async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-    stats_data = get_statistics(start_date=first_day_of_month)
-    message = format_stats_message(stats_data, "Статистика за месяц")
-    await update.message.reply_text(message, parse_mode='HTML')
-
-# Функция для получения статистики
 def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
     conn = sqlite3.connect('conversions.db')
     cursor = conn.cursor()
@@ -176,7 +139,6 @@ def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
         WHERE 1=1
     '''
     params = []
-
     if start_date:
         query += ' AND conversion_date >= ?'
         params.append(start_date)
@@ -189,19 +151,15 @@ def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
     if pp_name:
         query += ' AND pp_name = ?'
         params.append(pp_name)
-
     query += ' GROUP BY pp_name, offer_id'
     cursor.execute(query, params)
     results = cursor.fetchall()
     conn.close()
-
     return results
 
-# Форматирование сообщения со статистикой
 def format_stats_message(stats_data, title):
     if not stats_data:
         return f"📊 {title}:\n\nНет данных."
-
     message = f"📊 {title}:\n\n"
     for row in stats_data:
         pp_name, offer_id, total_revenue, total_conversions = row
@@ -213,9 +171,38 @@ def format_stats_message(stats_data, title):
         )
     return message
 
-# Создаём и настраиваем Telegram-приложение (telegram.ext.Application)
+# Обработчики команд Telegram
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет! Я бот для уведомлений о конверсиях.\n"
+        "Используй /help для списка команд."
+    )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    commands = (
+        "📋 Список доступных команд:\n"
+        "/start - Начать работу с ботом\n"
+        "/help - Показать список команд\n"
+        "/stats_today - Получить статистику за сегодня\n"
+        "/stats_month - Получить статистику за месяц"
+    )
+    await update.message.reply_text(commands)
+
+async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    today = datetime.now().strftime('%Y-%m-%d')
+    stats_data = get_statistics(start_date=today)
+    message = format_stats_message(stats_data, "Статистика за сегодня")
+    await update.message.reply_text(message, parse_mode='HTML')
+
+async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    stats_data = get_statistics(start_date=first_day_of_month)
+    message = format_stats_message(stats_data, "Статистика за месяц")
+    await update.message.reply_text(message, parse_mode='HTML')
+
+# Создаём и настраиваем telegram.ext Application для обработки команд
 telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CommandHandler("start", start_command))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(CommandHandler("stats_today", stats_today))
 telegram_app.add_handler(CommandHandler("stats_month", stats_month))
@@ -228,10 +215,11 @@ async def set_telegram_webhook():
 
 # Основная функция запуска приложения
 async def main():
-    init_db()  # Инициализация базы данных
+    init_db()
     await set_telegram_webhook()
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 8080))
     await app.run_task(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     asyncio.run(main())
+
