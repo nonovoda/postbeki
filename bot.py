@@ -95,5 +95,7 @@ async def webhook():
 # Запуск приложения
 if __name__ == "__main__":
     init_db()
-    asyncio.create_task(send_telegram_message_async({}))  # Запуск Telegram-бота
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(send_telegram_message_async({}))  # Запуск Telegram-бота
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
