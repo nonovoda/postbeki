@@ -1,4 +1,4 @@
-from flask import Flask, request
+from quart import Quart, request
 from telegram import Bot
 from telegram.request import HTTPXRequest
 import os
@@ -16,8 +16,8 @@ request = HTTPXRequest(
     connect_timeout=30  # Таймаут на подключение: 30 секунд
 )
 
-# Инициализация Flask и Telegram бота
-app = Flask(__name__)
+# Инициализация Quart и Telegram бота
+app = Quart(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN, request=request)
 
 # Асинхронная функция для отправки сообщения в Telegram
@@ -40,12 +40,12 @@ async def send_telegram_message_async(data):
 
 # Эндпоинт для обработки GET и POST запросов
 @app.route('/webhook', methods=['GET', 'POST'])
-def webhook():
+async def webhook():
     """
     Обрабатывает GET и POST запросы.
     """
     if request.method == 'POST':
-        data = request.json  # Данные из POST-запроса
+        data = await request.json  # Данные из POST-запроса
     else:
         data = request.args  # Данные из GET-запроса
 
@@ -63,14 +63,15 @@ def webhook():
     }
 
     # Запускаем асинхронную задачу
-    asyncio.run(send_telegram_message_async(message_data))
+    await send_telegram_message_async(message_data)
     return 'OK', 200
 
 # Эндпоинт для favicon.ico
 @app.route('/favicon.ico')
-def favicon():
+async def favicon():
     return '', 204  # Возвращаем пустой ответ
 
-# Запуск Flask-сервера
+# Запуск Quart-сервера
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
+    app.run(host='0.0.0.0', port=port)
