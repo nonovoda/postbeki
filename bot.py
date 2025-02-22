@@ -21,7 +21,7 @@ if not TELEGRAM_WEBHOOK_URL:
     logger.error("Переменная окружения TELEGRAM_WEBHOOK_URL не задана!")
     exit(1)
 
-# Инициализация Quart и Telegram бота
+# Инициализация Quart и Telegram-бота
 app = Quart(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
@@ -217,6 +217,8 @@ async def set_telegram_webhook():
 async def main():
     init_db()
     await set_telegram_webhook()
+    # Инициализируем telegram_app перед получением обновлений
+    await telegram_app.initialize()
     port = int(os.getenv('PORT', 8080))
     await app.run_task(host='0.0.0.0', port=port)
 
