@@ -1,4 +1,4 @@
-from quart import Quart, request
+from quart import Quart, request, jsonify
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import os
@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 
 # Загрузка конфигурации из переменных окружения
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # Токен Telegram-бота
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')  # Chat ID для отправки сообщений
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')        # Chat ID для отправки сообщений
+TELEGRAM_WEBHOOK_URL = os.getenv('TELEGRAM_WEBHOOK_URL')  # Базовый URL для Telegram вебхука
+
+if not TELEGRAM_WEBHOOK_URL:
+    logger.error("Переменная окружения TELEGRAM_WEBHOOK_URL не задана!")
+    exit(1)
 
 # Инициализация Quart и Telegram бота
 app = Quart(__name__)
@@ -77,26 +82,21 @@ async def send_telegram_message_async(data):
     except Exception as e:
         logger.error(f"Ошибка при отправке сообщения в Telegram: {e}")
 
-# Эндпоинт для обработки GET и POST запросов (постбеки)
+# Эндпоинт для обработки постбеков от партнёрских программ
 @app.route('/webhook', methods=['GET', 'POST'])
 async def webhook():
-    """
-    Обрабатывает GET и POST запросы.
-    """
     try:
         if request.method == 'POST':
             data = await request.json  # Данные из POST-запроса
         else:
             data = request.args  # Данные из GET-запроса
 
-        # Логирование данных запроса
-        logger.info(f"Получены данные: {data}")
+        logger.info(f"Получены данные постбека: {data}")
 
         if data is None:
             logger.error("Данные запроса отсутствуют или равны None.")
             return 'Bad Request: Данные отсутствуют', 400
 
-        # Формируем данные для отправки в Telegram
         message_data = {
             'pp_name': data.get('pp_name', 'N/A'),
             'offer_id': data.get('offer_id', 'N/A'),
@@ -111,29 +111,30 @@ async def webhook():
             'conversion_date': data.get('conversion_date', 'N/A')
         }
 
-        # Сохраняем конверсию в базу данных
         save_conversion(message_data)
-
-        # Логирование сформированных данных
         logger.info(f"Сформированные данные для Telegram: {message_data}")
 
-        # Запускаем асинхронную задачу по отправке сообщения в Telegram
         await send_telegram_message_async(message_data)
         return 'OK', 200
     except Exception as e:
-        logger.error(f"Ошибка при обработке запроса: {e}")
+        logger.error(f"Ошибка при обработке постбека: {e}")
         return 'Internal Server Error', 500
 
-# Эндпоинт для favicon.ico
-@app.route('/favicon.ico')
-async def favicon():
-    return '', 204  # Возвращаем пустой ответ
+# Эндпоинт для обработки Telegram-обновлений (команд)
+@app.route('/telegram', methods=['POST'])
+async def telegram_webhook():
+    try:
+        update_json = await request.get_json()
+        update = Update.de_json(update_json, bot)
+        # Передаём обновление в telegram.ext Application для обработки команд
+        await telegram_app.process_update(update)
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error(f"Ошибка при обработке Telegram обновления: {e}")
+        return jsonify({"ok": False}), 500
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает команду /start.
-    """
     await update.message.reply_text(
         "Привет! Я бот для уведомлений о конверсиях.\n"
         "Используй /help для списка команд."
@@ -141,9 +142,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Команда /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает команду /help.
-    """
     commands = (
         "📋 Список доступных команд:\n"
         "/start - Начать работу с ботом\n"
@@ -155,9 +153,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Команда /stats_today
 async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает команду /stats_today.
-    """
     today = datetime.now().strftime('%Y-%m-%d')
     stats_data = get_statistics(start_date=today)
     message = format_stats_message(stats_data, "Статистика за сегодня")
@@ -165,9 +160,6 @@ async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Команда /stats_month
 async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает команду /stats_month.
-    """
     first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
     stats_data = get_statistics(start_date=first_day_of_month)
     message = format_stats_message(stats_data, "Статистика за месяц")
@@ -221,31 +213,25 @@ def format_stats_message(stats_data, title):
         )
     return message
 
-# Функция для запуска бота
-async def run_bot():
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("stats_today", stats_today))
-    application.add_handler(CommandHandler("stats_month", stats_month))
-    
-    # Удаляем существующий webhook, чтобы polling корректно получал обновления
-    await application.bot.delete_webhook()
-    logger.info("Webhook удалён, начинается polling.")
-    
-    await application.run_polling()
+# Создаём и настраиваем Telegram-приложение (telegram.ext.Application)
+telegram_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CommandHandler("help", help_command))
+telegram_app.add_handler(CommandHandler("stats_today", stats_today))
+telegram_app.add_handler(CommandHandler("stats_month", stats_month))
 
-# Запуск Quart-сервера и бота
+# Функция для установки вебхука Telegram
+async def set_telegram_webhook():
+    full_url = TELEGRAM_WEBHOOK_URL.rstrip('/') + '/telegram'
+    await bot.set_webhook(url=full_url)
+    logger.info(f"Webhook для Telegram установлен: {full_url}")
+
+# Основная функция запуска приложения
 async def main():
     init_db()  # Инициализация базы данных
-
-    # Запуск бота в фоновом режиме
-    bot_task = asyncio.create_task(run_bot())
-
-    # Запуск Quart-сервера
-    port = int(os.getenv('PORT', 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
+    await set_telegram_webhook()
+    port = int(os.getenv('PORT', 5000))
     await app.run_task(host='0.0.0.0', port=port)
 
-# Запуск приложения
 if __name__ == '__main__':
     asyncio.run(main())
