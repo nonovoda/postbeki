@@ -22,7 +22,8 @@ async def send_telegram_message_async(data):
     """
     try:
         message = (
-            "<b>🔔 Новая конверсия!</b>\n\n"  # Жирный текст
+            f"<b>🔔 Новая конверсия!</b>\n\n"
+            f"📌 <b>Партнёрская программа:</b> <i>{data.get('pp_name', 'N/A')}</i>\n"
             f"📌 <b>Оффер:</b> <i>{data.get('offer_id', 'N/A')}</i>\n"
             f"🆔 <b>ID конверсии:</b> <i>{data.get('id', 'N/A')}</i>\n"
             f"🛠 <b>Подход:</b> <i>{data.get('sub_id3', 'N/A')}</i>\n"
@@ -59,6 +60,7 @@ async def webhook():
 
         # Формируем данные для отправки в Telegram
         message_data = {
+            'pp_name': data.get('pp_name', 'N/A'),  # Название партнёрской программы
             'offer_id': data.get('offer_id', 'N/A'),
             'id': data.get('id', 'N/A'),
             'sub_id3': data.get('sub_id3', 'N/A'),
