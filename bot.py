@@ -2,6 +2,7 @@ from quart import Quart, request
 from telegram import Bot
 import os
 import logging
+import sqlite3
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +15,40 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')  # Chat ID для отправ�
 # Инициализация Quart и Telegram бота
 app = Quart(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
+
+# Инициализация базы данных
+def init_db():
+    conn = sqlite3.connect('conversions.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS conversions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pp_name TEXT,
+            offer_id TEXT,
+            conversion_date TEXT,
+            revenue REAL,
+            currency TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Сохранение конверсии в базу данных
+def save_conversion(data):
+    conn = sqlite3.connect('conversions.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO conversions (pp_name, offer_id, conversion_date, revenue, currency)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (
+        data.get('pp_name', 'N/A'),
+        data.get('offer_id', 'N/A'),
+        data.get('conversion_date', 'N/A'),
+        data.get('revenue', 0),
+        data.get('currency', 'N/A')
+    ))
+    conn.commit()
+    conn.close()
 
 # Асинхронная функция для отправки сообщения в Telegram
 async def send_telegram_message_async(data):
@@ -60,7 +95,7 @@ async def webhook():
 
         # Формируем данные для отправки в Telegram
         message_data = {
-            'pp_name': data.get('pp_name', 'N/A'),  # Название партнёрской программы
+            'pp_name': data.get('pp_name', 'N/A'),
             'offer_id': data.get('offer_id', 'N/A'),
             'id': data.get('id', 'N/A'),
             'sub_id3': data.get('sub_id3', 'N/A'),
@@ -72,6 +107,9 @@ async def webhook():
             'sub_id5': data.get('sub_id5', 'N/A'),
             'conversion_date': data.get('conversion_date', 'N/A')
         }
+
+        # Сохраняем конверсию в базу данных
+        save_conversion(message_data)
 
         # Логирование сформированных данных
         logger.info(f"Сформированные данные для Telegram: {message_data}")
@@ -90,5 +128,6 @@ async def favicon():
 
 # Запуск Quart-сервера
 if __name__ == '__main__':
+    init_db()  # Инициализация базы данных
     port = int(os.getenv('PORT', 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
     app.run(host='0.0.0.0', port=port)
