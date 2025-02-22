@@ -6,6 +6,7 @@ from quart import Quart, request
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import asyncio
+import uvicorn
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -80,146 +81,19 @@ async def send_telegram_message_async(data):
 @app.route('/webhook', methods=['GET', 'POST'])
 async def webhook():
     try:
-        if request.method == 'POST':
-            data = await request.json
-        else:
-            data = request.args
-
+        data = await request.get_json() if request.method == 'POST' else request.args
         logger.info(f"Получены данные: {data}")
-
         if not data:
-            logger.error("Данные запроса отсутствуют.")
             return 'Bad Request: Данные отсутствуют', 400
-
-        message_data = {
-            'pp_name': data.get('pp_name', 'N/A'),
-            'offer_id': data.get('offer_id', 'N/A'),
-            'id': data.get('id', 'N/A'),
-            'sub_id3': data.get('sub_id3', 'N/A'),
-            'goal': data.get('goal', 'N/A'),
-            'status': data.get('status', 'N/A'),
-            'revenue': data.get('revenue', 'N/A'),
-            'currency': data.get('currency', 'N/A'),
-            'sub_id4': data.get('sub_id4', 'N/A'),
-            'sub_id5': data.get('sub_id5', 'N/A'),
-            'conversion_date': data.get('conversion_date', 'N/A')
-        }
-
-        # Сохраняем конверсию в базу данных в отдельном потоке
-        await asyncio.to_thread(save_conversion, message_data)
-
-        # Отправляем сообщение в Telegram
-        await send_telegram_message_async(message_data)
+        await asyncio.to_thread(save_conversion, data)
+        await send_telegram_message_async(data)
         return 'OK', 200
     except Exception as e:
         logger.error(f"Ошибка при обработке запроса: {e}")
         return 'Internal Server Error', 500
 
-# Эндпоинт для favicon.ico
-@app.route('/favicon.ico')
-async def favicon():
-    return '', 204
-
-# Команды бота
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Обработка команды /start")
-    await update.message.reply_text(
-        "Привет! Я бот для уведомлений о конверсиях.\n"
-        "Используй /help для списка команд."
-    )
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Обработка команды /help")
-    commands = (
-        "📋 Список доступных команд:\n"
-        "/start - Начать работу с ботом\n"
-        "/help - Показать список команд\n"
-        "/stats_today - Получить статистику за сегодня\n"
-        "/stats_month - Получить статистику за месяц"
-    )
-    await update.message.reply_text(commands)
-
-async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Обработка команды /stats_today")
-    today = datetime.now().strftime('%Y-%m-%d')
-    stats_data = await asyncio.to_thread(get_statistics, start_date=today)
-    message = format_stats_message(stats_data, "Статистика за сегодня")
-    await update.message.reply_text(message, parse_mode='HTML')
-
-async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Обработка команды /stats_month")
-    first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-    stats_data = await asyncio.to_thread(get_statistics, start_date=first_day_of_month)
-    message = format_stats_message(stats_data, "Статистика за месяц")
-    await update.message.reply_text(message, parse_mode='HTML')
-
-# Функция для получения статистики
-def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
-    with sqlite3.connect('conversions.db') as conn:
-        cursor = conn.cursor()
-
-        query = '''
-            SELECT pp_name, offer_id, SUM(revenue), COUNT(*)
-            FROM conversions
-            WHERE 1=1
-        '''
-        params = []
-
-        if start_date:
-            query += ' AND conversion_date >= ?'
-            params.append(start_date)
-        if end_date:
-            query += ' AND conversion_date <= ?'
-            params.append(end_date)
-        if offer_id:
-            query += ' AND offer_id = ?'
-            params.append(offer_id)
-        if pp_name:
-            query += ' AND pp_name = ?'
-            params.append(pp_name)
-
-        query += ' GROUP BY pp_name, offer_id'
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        return results
-
-# Форматирование сообщения со статистикой
-def format_stats_message(stats_data, title):
-    if not stats_data:
-        return f"📊 {title}:\n\nНет данных."
-
-    message = f"📊 {title}:\n\n"
-    for row in stats_data:
-        pp_name, offer_id, total_revenue, total_conversions = row
-        message += (
-            f"📌 Партнёрская программа: <i>{pp_name}</i>\n"
-            f"📌 Оффер: <i>{offer_id}</i>\n"
-            f"🤑 Общая выплата: <i>{total_revenue}</i>\n"
-            f"📊 Конверсий: <i>{total_conversions}</i>\n\n"
-        )
-    return message
-
-# Запуск бота
-async def run_bot():
-    logger.info("Запуск Telegram бота...")
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("stats_today", stats_today))
-    application.add_handler(CommandHandler("stats_month", stats_month))
-    await application.run_polling()
-
-# Основная функция
-async def main():
-    init_db()  # Инициализация базы данных
-
-    # Запуск бота в фоновом режиме
-    bot_task = asyncio.create_task(run_bot())
-
-    # Запуск Quart
-    port = int(os.getenv('PORT', 5000))  # Порт из переменной окружения или 5000 по умолчанию
-    await app.run_task(host='0.0.0.0', port=port)
-
 # Запуск приложения
-if __name__ == '__main__':
-    asyncio.run(main())
+if __name__ == "__main__":
+    init_db()
+    asyncio.create_task(send_telegram_message_async({}))  # Запуск Telegram-бота
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
