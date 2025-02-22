@@ -1,6 +1,5 @@
 quart
 python-telegram-bot
-sqlite3
 requests
 python-dotenv
 logging
