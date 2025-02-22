@@ -22,31 +22,16 @@ async def send_telegram_message_async(data):
     """
     try:
         message = (
-            "<b>🔔 Новая конверсия!</b>\n\n"  # Жирный текст с эмодзи
+            "🔔 Новая конверсия!\n"
             f"📌 Оффер: {data.get('offer_id', 'N/A')}\n"
-            f"🎯 Цель: {data.get('goal', 'N/A')}\n"
-            f"⚙️ Статус: {data.get('status', 'N/A')}\n"
-            f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
-            f"🌍 Страна: {data.get('country', 'N/A')}\n"
             f"🆔 ID конверсии: {data.get('id', 'N/A')}\n"
-            f"📅 Дата клика: {data.get('click_date', 'N/A')}\n"
-            f"📅 Дата конверсии: {data.get('conversion_date', 'N/A')}\n"
-            f"🖥 IP: {data.get('ip', 'N/A')}\n"
-            f"🎟 Промокод: {data.get('promocode', 'N/A')}\n"
-            f"🔗 SubId1: {data.get('sub_id1', 'N/A')}\n"
-            f"🔗 SubId2: {data.get('sub_id2', 'N/A')}\n"
-            f"🔗 SubId3: {data.get('sub_id3', 'N/A')}\n"
-            f"🔗 SubId4: {data.get('sub_id4', 'N/A')}\n"
-            f"🔗 SubId5: {data.get('sub_id5', 'N/A')}\n"
-            f"🔗 SubId6: {data.get('sub_id6', 'N/A')}\n"
-            f"🔗 SubId7: {data.get('sub_id7', 'N/A')}\n"
-            f"🔗 SubId8: {data.get('sub_id8', 'N/A')}\n"
-            f"🔗 SubId9: {data.get('sub_id9', 'N/A')}\n"
-            f"🔗 SubId10: {data.get('sub_id10', 'N/A')}\n"
-            f"📝 Custom1: {data.get('custom1', 'N/A')}\n"
-            f"📝 Custom2: {data.get('custom2', 'N/A')}\n"
-            f"📝 Custom3: {data.get('custom3', 'N/A')}\n"
-            f"📝 Custom4: {data.get('custom4', 'N/A')}\n"
+            f"🛠 Подход: {data.get('sub_id3', 'N/A')}\n"
+            f"📊 Тип конверсии: {data.get('goal', 'N/A')}\n"
+            f"⚙️ Статус конверсии: {data.get('status', 'N/A')}\n"
+            f"🤑 Выплата: {data.get('revenue', 'N/A')} {data.get('currency', 'N/A')}\n"
+            f"🎯 Кампания: {data.get('sub_id4', 'N/A')}\n"
+            f"🎯 Адсет: {data.get('sub_id5', 'N/A')}\n"
+            f"⏰ Время конверсии: {data.get('conversion_date', 'N/A')}"
         )
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='HTML')
         logger.info("Сообщение успешно отправлено в Telegram.")
@@ -75,30 +60,15 @@ async def webhook():
         # Формируем данные для отправки в Telegram
         message_data = {
             'offer_id': data.get('offer_id', 'N/A'),
+            'id': data.get('id', 'N/A'),
+            'sub_id3': data.get('sub_id3', 'N/A'),
             'goal': data.get('goal', 'N/A'),
             'status': data.get('status', 'N/A'),
             'revenue': data.get('revenue', 'N/A'),
             'currency': data.get('currency', 'N/A'),
-            'country': data.get('country', 'N/A'),
-            'id': data.get('id', 'N/A'),
-            'click_date': data.get('click_date', 'N/A'),
-            'conversion_date': data.get('conversion_date', 'N/A'),
-            'ip': data.get('ip', 'N/A'),
-            'promocode': data.get('promocode', 'N/A'),
-            'sub_id1': data.get('sub_id1', 'N/A'),
-            'sub_id2': data.get('sub_id2', 'N/A'),
-            'sub_id3': data.get('sub_id3', 'N/A'),
             'sub_id4': data.get('sub_id4', 'N/A'),
             'sub_id5': data.get('sub_id5', 'N/A'),
-            'sub_id6': data.get('sub_id6', 'N/A'),
-            'sub_id7': data.get('sub_id7', 'N/A'),
-            'sub_id8': data.get('sub_id8', 'N/A'),
-            'sub_id9': data.get('sub_id9', 'N/A'),
-            'sub_id10': data.get('sub_id10', 'N/A'),
-            'custom1': data.get('custom1', 'N/A'),
-            'custom2': data.get('custom2', 'N/A'),
-            'custom3': data.get('custom3', 'N/A'),
-            'custom4': data.get('custom4', 'N/A')
+            'conversion_date': data.get('conversion_date', 'N/A')
         }
 
         # Логирование сформированных данных
