@@ -62,9 +62,7 @@ def get_statistics(start_date, end_date):
 # Форматирование статистики для отправки в Telegram
 def format_stats_message(stats_data, title):
     if not stats_data or stats_data[0] is None:
-        return f"📊 {title}:
-
-Нет данных за выбранный период."
+        return f"📊 {title}:\n\nНет данных за выбранный период."
 
     message = (
         f"📊 <b>{title}</b>\n"
