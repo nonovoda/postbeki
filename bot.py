@@ -6,7 +6,6 @@ from quart import Quart, request
 from telegram import Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 import asyncio
-from aiosqlite import connect as aiosqlite_connect  # Асинхронный SQLite
 
 # Настройка логгера
 logging.basicConfig(level=logging.INFO)
@@ -25,9 +24,10 @@ app = Quart(__name__)
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 # Инициализация базы данных
-async def init_db():
-    async with aiosqlite_connect('conversions.db') as conn:
-        await conn.execute('''
+def init_db():
+    with sqlite3.connect('conversions.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS conversions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pp_name TEXT,
@@ -37,12 +37,13 @@ async def init_db():
                 currency TEXT
             )
         ''')
-        await conn.commit()
+        conn.commit()
 
 # Сохранение конверсии в базу данных
-async def save_conversion(data):
-    async with aiosqlite_connect('conversions.db') as conn:
-        await conn.execute('''
+def save_conversion(data):
+    with sqlite3.connect('conversions.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
             INSERT INTO conversions (pp_name, offer_id, conversion_date, revenue, currency)
             VALUES (?, ?, ?, ?, ?)
         ''', (
@@ -52,7 +53,7 @@ async def save_conversion(data):
             data.get('revenue', 0),
             data.get('currency', 'N/A')
         ))
-        await conn.commit()
+        conn.commit()
 
 # Асинхронная функция для отправки сообщения в Telegram
 async def send_telegram_message_async(data):
@@ -104,7 +105,10 @@ async def webhook():
             'conversion_date': data.get('conversion_date', 'N/A')
         }
 
-        await save_conversion(message_data)
+        # Сохраняем конверсию в базу данных в отдельном потоке
+        await asyncio.to_thread(save_conversion, message_data)
+
+        # Отправляем сообщение в Telegram
         await send_telegram_message_async(message_data)
         return 'OK', 200
     except Exception as e:
@@ -135,19 +139,21 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stats_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.now().strftime('%Y-%m-%d')
-    stats_data = await get_statistics(start_date=today)
+    stats_data = await asyncio.to_thread(get_statistics, start_date=today)
     message = format_stats_message(stats_data, "Статистика за сегодня")
     await update.message.reply_text(message, parse_mode='HTML')
 
 async def stats_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_day_of_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-    stats_data = await get_statistics(start_date=first_day_of_month)
+    stats_data = await asyncio.to_thread(get_statistics, start_date=first_day_of_month)
     message = format_stats_message(stats_data, "Статистика за месяц")
     await update.message.reply_text(message, parse_mode='HTML')
 
-# Асинхронная функция для получения статистики
-async def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
-    async with aiosqlite_connect('conversions.db') as conn:
+# Функция для получения статистики
+def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=None):
+    with sqlite3.connect('conversions.db') as conn:
+        cursor = conn.cursor()
+
         query = '''
             SELECT pp_name, offer_id, SUM(revenue), COUNT(*)
             FROM conversions
@@ -169,8 +175,8 @@ async def get_statistics(start_date=None, end_date=None, offer_id=None, pp_name=
             params.append(pp_name)
 
         query += ' GROUP BY pp_name, offer_id'
-        cursor = await conn.execute(query, params)
-        results = await cursor.fetchall()
+        cursor.execute(query, params)
+        results = cursor.fetchall()
         return results
 
 # Форматирование сообщения со статистикой
@@ -200,9 +206,9 @@ async def run_bot():
 
 # Основная функция
 async def main():
-    await init_db()
-    bot_task = asyncio.create_task(run_bot())
-    port = int(os.getenv('PORT', 5000))
+    init_db()  # Инициализация базы данных
+    bot_task = asyncio.create_task(run_bot())  # Запуск бота в фоновом режиме
+    port = int(os.getenv('PORT', 5000))  # Порт из переменной окружения или 5000 по умолчанию
     await app.run_task(host='0.0.0.0', port=port)
 
 # Запуск приложения
