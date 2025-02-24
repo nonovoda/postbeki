@@ -81,13 +81,17 @@ async def set_telegram_webhook():
 async def webhook():
     try:
         data = await request.get_json()
+        logger.info(f"Получены данные: {data}")  # Лог перед обработкой
+
         if not data:
-            return jsonify({"error": "No data received"}), 400
-        await save_conversion(data)
-        await send_telegram_message_async(data)
+            logger.error("Данные запроса отсутствуют.")
+            return jsonify({"error": "Bad Request: No data"}), 400
+
+        await save_conversion(data)  # Сохранение в БД
+        await send_telegram_message_async(data)  # Отправка в Telegram
         return jsonify({"status": "OK"}), 200
     except Exception as e:
-        logger.error(f"Ошибка при обработке запроса: {e}")
+        logger.error(f"Ошибка при обработке постбека: {e}")
         return jsonify({"error": "Internal Server Error"}), 500
 
 # Асинхронная функция для отправки сообщений в Telegram
