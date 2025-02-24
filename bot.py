@@ -60,7 +60,7 @@ async def save_conversion(data):
             data.get('pp_name', 'N/A'),
             data.get('offer_id', 'N/A'),
             data.get('conversion_date', 'N/A'),
-            data.get('revenue', 0),
+            data.get('revenue', 0.0),
             data.get('currency', 'N/A'),
             data.get('status', 'N/A')
         ))
@@ -77,11 +77,11 @@ async def set_telegram_webhook():
         exit(1)
 
 # Эндпоинт для постбеков
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['POST', 'GET'])
 async def webhook():
     try:
-        data = await request.get_json()
-        logger.info(f"Получены данные: {data}")  # Лог перед обработкой
+        data = await request.get_json() if request.method == 'POST' else request.args
+        logger.info(f"Получены данные: {data}")
 
         if not data:
             logger.error("Данные запроса отсутствуют.")
@@ -116,4 +116,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
